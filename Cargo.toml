@@ -1,0 +1,29 @@
+[package]
+name = "santh-error"
+version = "0.2.1"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Santh Project <contact@santh.dev>"]
+homepage = "https://santh.dev"
+repository = "https://github.com/santhreal/santh-error"
+documentation = "https://docs.rs/santh-error"
+description = "Actionable error primitives  -  stable error codes, fix hints, and built-in secret redaction"
+keywords = ["error", "diagnostics", "redaction", "security"]
+categories = ["rust-patterns", "development-tools"]
+readme = "README.md"
+publish = true
+
+[package.metadata.santh]
+status = "beta"
+
+[dependencies]
+regex = { version = "1.12.3" }
+serde = { version = "=1.0.228", optional = true, features = ["derive"] }
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dev-dependencies]
+proptest = "=1.9.0"
