@@ -21,8 +21,7 @@ passes through built-in secret redaction.
 ```rust
 use santh_error::SanthError;
 
-let err = SanthError::new("CFG-E001")
-    .title("config file not found")
+let err = SanthError::new("CFG-E001", "config file not found")
     .fix("Fix: create config.toml or pass --config")
     .build();
 

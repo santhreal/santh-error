@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.2] - 2026-08-07
+
+### Security
+- Expanded secret redaction (Slack/GCP/Stripe/compound KV).
+
+### Changed
+- Crate authors set to Santh noreply.
+
+
 All notable changes to this crate are documented here, following
 [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 
@@ -18,6 +27,10 @@ All notable changes to this crate are documented here, following
 - `redact_secrets` now redacts dotted bearer tokens (`Bearer abc.def.ghi`).
   The pattern previously accepted only URL-safe base64, so OAuth access tokens
   whose bodies contain dots leaked in full.
+- `redact_secrets` now redacts Slack API tokens (`xoxb-`, `xoxp-`, `xapp-`, etc.),
+  GCP API keys (`AIzaSy...`), Stripe API keys (`sk_live_...`, `rk_live_...`), and
+  compound KV secret pairs (`client_secret=`, `secret_key=`, `access_token=`,
+  `passphrase=`, `signing_key=`).
 
 ## 0.2.0
 

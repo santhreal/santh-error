@@ -238,3 +238,58 @@ fn redact_bearer_token_with_dots() {
     );
     assert!(out.contains("[REDACTED]"));
 }
+
+#[test]
+fn redact_slack_token() {
+    // Built at runtime so the source never contains a push-protection match.
+    let token = format!(
+        "xox{}-{}-{}-{}",
+        "b",
+        "123456789012",
+        "1234567890123",
+        "abcdefghijklmnopqrstuvwx"
+    );
+    let out = redact_secrets(&token);
+    assert!(!out.contains(&token));
+    assert!(out.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_gcp_api_key() {
+    // Built at runtime so the source never contains a push-protection match.
+    let key = format!("{}{}", "AIzaSy", "D1234567890abcdefghijklmnopqrstuv");
+    let out = redact_secrets(&key);
+    assert!(!out.contains(&key));
+    assert!(out.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_stripe_api_key() {
+    // Built at runtime so the source never contains a push-protection match.
+    let key = format!(
+        "{}_{}_{}",
+        "sk",
+        "live",
+        "51M01234567890abcdefghijklmnopqrstuvwx"
+    );
+    let out = redact_secrets(&key);
+    assert!(!out.contains(&key));
+    assert!(out.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_extended_kv_secrets() {
+    let cases = [
+        ("client_secret=super_secret_value_123", "super_secret_value_123"),
+        ("secret_key=my_secret_key_456", "my_secret_key_456"),
+        ("access_token=my_oauth_access_token_789", "my_oauth_access_token_789"),
+        ("passphrase=my_secret_passphrase", "my_secret_passphrase"),
+        ("signing_key=my_signing_key_val", "my_signing_key_val"),
+    ];
+
+    for (input, secret) in &cases {
+        let out = redact_secrets(input);
+        assert!(!out.contains(secret), "failed to redact secret in: {input}");
+        assert!(out.contains("[REDACTED]"), "missing [REDACTED] in: {input}");
+    }
+}
