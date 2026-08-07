@@ -165,3 +165,29 @@ fn builder_and_built_mutators_render_identically() {
     assert!(msg.contains("Caused by:"), "source chain must render: {msg}");
     assert!(msg.contains("underlying io failure"), "source msg must render: {msg}");
 }
+#[test]
+fn contract_fix_hint_without_prefix_gets_normalised() {
+    #[derive(Debug)]
+    struct CustomContractError;
+    impl fmt::Display for CustomContractError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "Custom failure")
+        }
+    }
+    impl std::error::Error for CustomContractError {}
+    impl SanthErrorContract for CustomContractError {
+        fn error_code(&self) -> &'static str {
+            "CUSTOM-E001"
+        }
+        fn fix_hint(&self) -> Cow<'_, str> {
+            Cow::Borrowed("Verify network connectivity and retry.")
+        }
+    }
+
+    let err = CustomContractError;
+    let msg = err.actionable_message();
+    assert!(
+        msg.contains("Fix: Verify network connectivity and retry."),
+        "actionable message must normalise missing 'Fix: ' prefix: {msg}"
+    );
+}

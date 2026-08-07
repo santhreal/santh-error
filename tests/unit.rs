@@ -176,3 +176,39 @@ fn dynamic_context_key_works() {
     let msg = err.actionable_message();
     assert!(msg.contains("dynamic: value"));
 }
+#[test]
+fn multiline_and_empty_source_error_formatting() {
+    #[derive(Debug)]
+    struct MultilineSource;
+    impl std::fmt::Display for MultilineSource {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "first line\nsecond line")
+        }
+    }
+    impl std::error::Error for MultilineSource {}
+
+    let err = SanthError::new("TEST-M001", "Multiline source error")
+        .with_source(MultilineSource)
+        .fix("Fix: Inspect the multiline source cause.")
+        .build();
+
+    let msg = err.actionable_message();
+    assert!(msg.contains("  - first line\n    second line"));
+
+    #[derive(Debug)]
+    struct EmptySource;
+    impl std::fmt::Display for EmptySource {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "")
+        }
+    }
+    impl std::error::Error for EmptySource {}
+
+    let err_empty = SanthError::new("TEST-M002", "Empty source error")
+        .with_source(EmptySource)
+        .fix("Fix: Handle empty source cause.")
+        .build();
+
+    let msg_empty = err_empty.actionable_message();
+    assert!(msg_empty.contains("  - (empty error message)"));
+}

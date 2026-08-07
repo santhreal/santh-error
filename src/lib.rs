@@ -217,7 +217,6 @@ impl SanthErrorBuilder<HasFix> {
 /// - Optional diagnostic `context`.
 /// - An optional source error chain.
 /// - An optional `location` in source or configuration.
-#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SanthError {
     code: &'static str,
@@ -227,6 +226,36 @@ pub struct SanthError {
     #[cfg_attr(feature = "serde", serde(skip))]
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
     location: Option<ErrorLocation>,
+}
+
+impl fmt::Debug for SanthError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let redacted_title = redact_secrets(&self.title);
+        let redacted_fix = redact_secrets(&self.fix);
+        let redacted_context: Vec<(Cow<'static, str>, String)> = self
+            .context
+            .iter()
+            .map(|(k, v)| (k.clone(), redact_secrets(v)))
+            .collect();
+        let redacted_location = self.location.as_ref().map(|loc| ErrorLocation {
+            file: redact_secrets(&loc.file),
+            line: loc.line,
+            column: loc.column,
+        });
+        let redacted_source = self
+            .source
+            .as_ref()
+            .map(|src| redact_secrets(&format!("{src:?}")));
+
+        let mut ds = f.debug_struct("SanthError");
+        ds.field("code", &self.code);
+        ds.field("title", &redacted_title);
+        ds.field("fix", &redacted_fix);
+        ds.field("context", &redacted_context);
+        ds.field("source", &redacted_source);
+        ds.field("location", &redacted_location);
+        ds.finish()
+    }
 }
 
 impl SanthError {
@@ -315,7 +344,15 @@ pub(crate) fn compose_message(
     msg.push_str(title);
     msg.push('\n');
     msg.push('\n');
-    msg.push_str(fix);
+
+    let fix_normalised;
+    let fix_str = if fix.starts_with("Fix: ") {
+        fix
+    } else {
+        fix_normalised = format!("Fix: {fix}");
+        &fix_normalised
+    };
+    msg.push_str(fix_str);
 
     if !context.is_empty() {
         msg.push('\n');
@@ -358,7 +395,12 @@ pub(crate) fn compose_message(
             }
             msg.push('\n');
             msg.push_str("  - ");
-            msg.push_str(&err.to_string());
+            let err_str = err.to_string();
+            if err_str.trim().is_empty() {
+                msg.push_str("(empty error message)");
+            } else {
+                msg.push_str(&err_str.replace('\n', "\n    "));
+            }
             current = err.source();
             links += 1;
         }

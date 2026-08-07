@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.3] - 2026-08-07
+
+### Security
+- Redact `SanthError` fields in `fmt::Debug` output to prevent credential leakage via `{:?}` debug logging.
+- Expanded secret redaction to cover HTTP `Basic` authorization headers, GitLab PATs (`glpat-`), Slack `xapp-` tokens, `credential(s)=` KV pairs, and PGP/encrypted PEM private key blocks.
+
+### Fixed
+- `compose_message` now normalises `fix_hint` values from custom `SanthErrorContract` implementations to guarantee the `"Fix: "` prefix invariant fleet-wide.
+- Multiline source error messages in `Caused by:` chains are indented for clean bullet alignment, and empty source error messages are rendered as `(empty error message)` instead of blank lines.
+
 ## [0.2.2] - 2026-08-07
 
 ### Security

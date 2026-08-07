@@ -293,3 +293,82 @@ fn redact_extended_kv_secrets() {
         assert!(out.contains("[REDACTED]"), "missing [REDACTED] in: {input}");
     }
 }
+#[test]
+fn secret_in_debug_format_gets_redacted() {
+    #[derive(Debug)]
+    struct SecretSource;
+    impl std::fmt::Display for SecretSource {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "source bearer token Bearer supersecrettoken999")
+        }
+    }
+    impl std::error::Error for SecretSource {}
+
+    let err = SanthError::new("TEST-DBG-01", "Failed with AKIAIOSFODNN7EXAMPLE key")
+        .fix("Fix: Use password=supersecretpass in config.")
+        .with_context("auth_token", "Bearer sk-123456789012345678901234")
+        .with_location(santh_error::ErrorLocation::new("/tmp/secret_path/file.rs").with_line(5))
+        .with_source(SecretSource)
+        .build();
+
+    let debug_out = format!("{err:?}");
+    let debug_pretty = format!("{err:#?}");
+
+    for out in [&debug_out, &debug_pretty] {
+        assert!(!out.contains("AKIAIOSFODNN7EXAMPLE"), "debug output leaked AWS key: {out}");
+        assert!(!out.contains("supersecretpass"), "debug output leaked password: {out}");
+        assert!(!out.contains("sk-123456789012345678901234"), "debug output leaked token: {out}");
+        assert!(out.contains("[REDACTED]"), "debug output must contain [REDACTED]: {out}");
+    }
+}
+
+#[test]
+fn redact_basic_auth_header() {
+    let raw = "Authorization: Basic dXNlcjpwYXNz";
+    let safe = redact_secrets(raw);
+    assert!(!safe.contains("dXNlcjpwYXNz"));
+    assert!(safe.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_gitlab_pat() {
+    let raw = "glpat-0123456789abcdefghij";
+    let safe = redact_secrets(raw);
+    assert!(!safe.contains("glpat-0123456789abcdefghij"));
+    assert!(safe.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_slack_xapp_token() {
+    let raw = "xapp-1-A0123456789-0123456789012-0123456789abcdef";
+    let safe = redact_secrets(raw);
+    assert!(!safe.contains("xapp-1-A0123456789-0123456789012-0123456789abcdef"));
+    assert!(safe.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_credential_kv() {
+    let cases = [
+        ("credentials = \"my_super_secret_credentials\"", "my_super_secret_credentials"),
+        ("credential: 'my_single_quoted_credential'", "my_single_quoted_credential"),
+    ];
+
+    for (input, secret) in &cases {
+        let out = redact_secrets(input);
+        assert!(!out.contains(secret), "failed to redact credential in: {input}");
+        assert!(out.contains("[REDACTED]"), "missing [REDACTED] in: {input}");
+    }
+}
+
+#[test]
+fn redact_pgp_and_encrypted_private_keys() {
+    let pgp_key = "-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: PGPselect v2.6.2\n\nmQGiBD12345...\n-----END PGP PRIVATE KEY BLOCK-----";
+    let safe_pgp = redact_secrets(pgp_key);
+    assert!(!safe_pgp.contains("mQGiBD12345"));
+    assert!(safe_pgp.contains("[REDACTED]"));
+
+    let enc_key = "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQI...\n-----END ENCRYPTED PRIVATE KEY-----";
+    let safe_enc = redact_secrets(enc_key);
+    assert!(!safe_enc.contains("MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQI"));
+    assert!(safe_enc.contains("[REDACTED]"));
+}

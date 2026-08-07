@@ -32,19 +32,19 @@ static SECRET_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         compile("aws_access_key", r"A[KS]IA[0-9A-Z]{16}"),
         compile("github_pat_classic", r"gh[pousr]_[A-Za-z0-9_]{36,}"),
         compile("github_pat_fine", r"github_pat_[A-Za-z0-9_]{22,}"),
+        compile("gitlab_pat", r"glpat-[A-Za-z0-9_-]{20,}"),
         compile(
             "jwt",
             r"eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*",
         ),
-        // The token body may also carry dots (OAuth access tokens are not
-        // always JWTs, and compact serialization separates segments with
-        // `.`), so the charset includes `.` alongside URL-safe base64.
-        compile("bearer", r"(?i)Bearer\s+[A-Za-z0-9_.-]+"),
+        // Bearer or Basic authorization tokens/credentials.
+        compile("auth_header", r"(?i)(?:Bearer|Basic)\s+[A-Za-z0-9_./+-]+=*"),
         compile("password_kv", &format!(r"(?i)(?:pass(?:word|wd|code)|passphrase)\s*[=:]\s*{KV_VALUE}")),
         compile("api_key_kv", &format!(r"(?i)(?:api|secret|access|private|master|signing|encryption|auth|session)[_-]?key\s*[=:]\s*{KV_VALUE}")),
         compile("token_kv", &format!(r"(?i)(?:[a-z0-9_-]+[_-])?token\s*[=:]\s*{KV_VALUE}")),
         compile("secret_kv", &format!(r"(?i)(?:[a-z0-9_-]+[_-])?secret(?:[_-][a-z0-9_-]+)?\s*[=:]\s*{KV_VALUE}")),
-        compile("slack_token", r"xox[baprs]-[a-zA-Z0-9_-]{10,}"),
+        compile("credential_kv", &format!(r"(?i)credentials?\s*[=:]\s*{KV_VALUE}")),
+        compile("slack_token", r"(?:xox[baprs]|xapp)-[a-zA-Z0-9_-]{10,}"),
         compile("gcp_api_key", r"AIzaSy[A-Za-z0-9_-]{33}"),
         compile("stripe_api_key", r"(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,}"),
         // Body allows '-' and '_' so project keys (sk-proj-...) and other
@@ -53,7 +53,7 @@ static SECRET_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         compile("openai_api_key", r"sk-[a-zA-Z0-9_-]{20,}"),
         compile(
             "pem_private_key",
-            r"-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----",
+            r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY(?: BLOCK)?-----",
         ),
     ]
 });
