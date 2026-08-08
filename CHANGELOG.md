@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.4] - 2026-08-07
+### Security
+- Redact context keys in `fmt::Debug` output for `SanthError` to prevent secret leakage in `{:?}` logging.
+- Expanded secret redaction to cover HTTP `Digest` and `Token` authorization headers, HuggingFace tokens (`hf_`), and expanded password KV variants (`pwd=`, `db_pwd=`, `pass=`).
+- Reordered URL userinfo credential masking in `redact_secrets` prior to pattern matching so KV secret rules do not corrupt URL userinfo masking.
+
+### Fixed
+- `From<std::io::Error> for SanthError` now explicitly classifies `InvalidData` (`SANTH-IO-INVALDATA`), `WouldBlock` (`SANTH-IO-WOULDBLOCK`), `AddrInUse` (`SANTH-IO-ADDRINUSE`), `AddrNotAvailable` (`SANTH-IO-ADDRNOTAVAIL`), and `ReadOnlyFilesystem` (`SANTH-IO-ROFS`), eliminating generic fallbacks to `SANTH-IO-01`.
+- `normalise_fix` normalises `"Fix:create"`, `"fix: create"`, `"FIX: create"` without generating duplicated prefixes (`"Fix: Fix:..."`).
+
 ## [0.2.3] - 2026-08-07
 
 ### Security

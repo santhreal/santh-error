@@ -192,11 +192,7 @@ impl SanthErrorBuilder<HasFix> {
         // impossible branch panic-free; a hint missing the contract prefix is
         // normalised to the "Fix: " prefix just below.
         let fix = self.fix.unwrap_or_default();
-        let fix = if fix.starts_with("Fix: ") {
-            fix
-        } else {
-            format!("Fix: {fix}")
-        };
+        let fix = normalise_fix(&fix);
         SanthError {
             code: self.code,
             title: self.title,
@@ -235,7 +231,7 @@ impl fmt::Debug for SanthError {
         let redacted_context: Vec<(Cow<'static, str>, String)> = self
             .context
             .iter()
-            .map(|(k, v)| (k.clone(), redact_secrets(v)))
+            .map(|(k, v)| (redact_secrets(k).into(), redact_secrets(v)))
             .collect();
         let redacted_location = self.location.as_ref().map(|loc| ErrorLocation {
             file: redact_secrets(&loc.file),
@@ -318,6 +314,21 @@ impl SanthError {
     impl_diagnostic_mutators!();
 }
 
+pub(crate) fn normalise_fix(fix: &str) -> String {
+    let trimmed = fix.trim();
+    if trimmed.starts_with("Fix: ") {
+        trimmed.to_string()
+    } else if let Some(rest) = trimmed.strip_prefix("Fix:") {
+        format!("Fix: {}", rest.trim_start())
+    } else if let Some(rest) = trimmed.strip_prefix("fix:") {
+        format!("Fix: {}", rest.trim_start())
+    } else if let Some(rest) = trimmed.strip_prefix("FIX:") {
+        format!("Fix: {}", rest.trim_start())
+    } else {
+        format!("Fix: {trimmed}")
+    }
+}
+
 /// Render the canonical Santh actionable message from its parts.
 ///
 /// This is the single formatter shared by [`SanthError::actionable_message`]
@@ -345,14 +356,8 @@ pub(crate) fn compose_message(
     msg.push('\n');
     msg.push('\n');
 
-    let fix_normalised;
-    let fix_str = if fix.starts_with("Fix: ") {
-        fix
-    } else {
-        fix_normalised = format!("Fix: {fix}");
-        &fix_normalised
-    };
-    msg.push_str(fix_str);
+    let fix_normalised = normalise_fix(fix);
+    msg.push_str(&fix_normalised);
 
     if !context.is_empty() {
         msg.push('\n');
@@ -474,6 +479,31 @@ impl From<std::io::Error> for SanthError {
                 "SANTH-IO-INVAL",
                 "Invalid input parameter",
                 "Fix: Check that all arguments to the I/O operation are valid and within supported ranges.",
+            ),
+            std::io::ErrorKind::InvalidData => (
+                "SANTH-IO-INVALDATA",
+                "Invalid data encountered",
+                "Fix: Ensure the input data matches the expected format and schema, and is not corrupted.",
+            ),
+            std::io::ErrorKind::WouldBlock => (
+                "SANTH-IO-WOULDBLOCK",
+                "Operation would block",
+                "Fix: Retry the operation when the resource is ready or switch to asynchronous non-blocking I/O.",
+            ),
+            std::io::ErrorKind::AddrInUse => (
+                "SANTH-IO-ADDRINUSE",
+                "Address already in use",
+                "Fix: Choose a different port or network address, or terminate the process currently holding the address.",
+            ),
+            std::io::ErrorKind::AddrNotAvailable => (
+                "SANTH-IO-ADDRNOTAVAIL",
+                "Address not available",
+                "Fix: Verify the local network interface and IP address configuration.",
+            ),
+            std::io::ErrorKind::ReadOnlyFilesystem => (
+                "SANTH-IO-ROFS",
+                "Read-only file system",
+                "Fix: Remount the file system with write permissions or write the file to a writable location.",
             ),
             std::io::ErrorKind::UnexpectedEof => (
                 "SANTH-IO-EOF",

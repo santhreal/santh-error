@@ -37,14 +37,15 @@ static SECRET_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
             "jwt",
             r"eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*",
         ),
-        // Bearer or Basic authorization tokens/credentials.
-        compile("auth_header", r"(?i)(?:Bearer|Basic)\s+[A-Za-z0-9_./+-]+=*"),
-        compile("password_kv", &format!(r"(?i)(?:pass(?:word|wd|code)|passphrase)\s*[=:]\s*{KV_VALUE}")),
+        // Bearer, Basic, Digest, or Token authorization headers/credentials.
+        compile("auth_header", &format!(r"(?i)(?:Bearer|Basic|Digest|Token)\s+{KV_VALUE}")),
+        compile("password_kv", &format!(r"(?i)(?:[a-z0-9_-]+[_-])?(?:pass(?:word|wd|code)?|passphrase|pwd)\s*[=:]\s*{KV_VALUE}")),
         compile("api_key_kv", &format!(r"(?i)(?:api|secret|access|private|master|signing|encryption|auth|session)[_-]?key\s*[=:]\s*{KV_VALUE}")),
         compile("token_kv", &format!(r"(?i)(?:[a-z0-9_-]+[_-])?token\s*[=:]\s*{KV_VALUE}")),
         compile("secret_kv", &format!(r"(?i)(?:[a-z0-9_-]+[_-])?secret(?:[_-][a-z0-9_-]+)?\s*[=:]\s*{KV_VALUE}")),
         compile("credential_kv", &format!(r"(?i)credentials?\s*[=:]\s*{KV_VALUE}")),
         compile("slack_token", r"(?:xox[baprs]|xapp)-[a-zA-Z0-9_-]{10,}"),
+        compile("huggingface_token", r"hf_[A-Za-z0-9]{34,}"),
         compile("gcp_api_key", r"AIzaSy[A-Za-z0-9_-]{33}"),
         compile("stripe_api_key", r"(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,}"),
         // Body allows '-' and '_' so project keys (sk-proj-...) and other
@@ -90,7 +91,15 @@ static URL_USERINFO: LazyLock<Regex> =
 /// assert!(url.contains("https://***@example.com/path"));
 /// ```
 pub fn redact_secrets(input: &str) -> String {
-    let mut output = input.to_string();
+    // Mask credentials embedded in URL userinfo, preserving scheme and host,
+    // before general secret pattern matching so URL userinfo like `https://pwd:pass@host`
+    // is masked into `https://***@host` first rather than triggering KV redactions.
+    let mut output = if let Cow::Owned(replaced) = URL_USERINFO.replace_all(input, "://***@") {
+        replaced
+    } else {
+        input.to_string()
+    };
+
     for pattern in SECRET_PATTERNS.iter() {
         // `replace_all` returns `Cow::Borrowed` when the pattern does not match,
         // so only take (and keep) a new allocation when a redaction actually
@@ -99,10 +108,6 @@ pub fn redact_secrets(input: &str) -> String {
         if let Cow::Owned(replaced) = pattern.replace_all(&output, "[REDACTED]") {
             output = replaced;
         }
-    }
-    // Mask credentials embedded in URL userinfo, preserving scheme and host.
-    if let Cow::Owned(replaced) = URL_USERINFO.replace_all(&output, "://***@") {
-        output = replaced;
     }
     output
 }

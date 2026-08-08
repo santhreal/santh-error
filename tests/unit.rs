@@ -212,3 +212,43 @@ fn multiline_and_empty_source_error_formatting() {
     let msg_empty = err_empty.actionable_message();
     assert!(msg_empty.contains("  - (empty error message)"));
 }
+
+#[test]
+fn from_io_error_discriminates_invalid_data() {
+    let io_err = std::io::Error::new(std::io::ErrorKind::InvalidData, "corrupt payload");
+    let err = SanthError::from(io_err);
+    assert_eq!(err.code(), "SANTH-IO-INVALDATA");
+    assert!(err.title().contains("Invalid data"));
+    assert!(err.fix_hint().contains("Fix: Ensure the input data matches"));
+}
+
+#[test]
+fn from_io_error_discriminates_would_block() {
+    let io_err = std::io::Error::new(std::io::ErrorKind::WouldBlock, "socket would block");
+    let err = SanthError::from(io_err);
+    assert_eq!(err.code(), "SANTH-IO-WOULDBLOCK");
+    assert!(err.title().contains("Operation would block"));
+}
+
+#[test]
+fn from_io_error_discriminates_addr_in_use() {
+    let io_err = std::io::Error::new(std::io::ErrorKind::AddrInUse, "port taken");
+    let err = SanthError::from(io_err);
+    assert_eq!(err.code(), "SANTH-IO-ADDRINUSE");
+    assert!(err.fix_hint().contains("Choose a different port"));
+}
+
+#[test]
+fn fix_hint_normalisation_variants() {
+    let err1 = SanthError::new("TEST-01", "t1").fix("Fix:create file").build();
+    assert_eq!(err1.fix_hint(), "Fix: create file");
+
+    let err2 = SanthError::new("TEST-02", "t2").fix("fix: create file").build();
+    assert_eq!(err2.fix_hint(), "Fix: create file");
+
+    let err3 = SanthError::new("TEST-03", "t3").fix("FIX:create file").build();
+    assert_eq!(err3.fix_hint(), "Fix: create file");
+
+    let err4 = SanthError::new("TEST-04", "t4").fix("create file").build();
+    assert_eq!(err4.fix_hint(), "Fix: create file");
+}

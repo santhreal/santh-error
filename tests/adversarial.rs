@@ -372,3 +372,54 @@ fn redact_pgp_and_encrypted_private_keys() {
     assert!(!safe_enc.contains("MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQI"));
     assert!(safe_enc.contains("[REDACTED]"));
 }
+#[test]
+fn secret_in_context_key_gets_redacted_in_debug_format() {
+    let secret = "sk-proj-12345678901234567890";
+    let err = SanthError::new("AUTH-01", "authentication failed")
+        .fix("Fix: pass valid credentials")
+        .with_context(format!("key_{secret}"), "failed")
+        .build();
+
+    let debug_output = format!("{err:?}");
+    assert!(
+        !debug_output.contains(secret),
+        "Secret context key leaked in Debug output: {debug_output}"
+    );
+    assert!(debug_output.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_extended_password_kv_variants() {
+    let cases = [
+        ("pwd=my_secret_password_123", "my_secret_password_123"),
+        ("db_pwd = 'database_pass_456'", "database_pass_456"),
+        ("pass = \"simple_pass_789\"", "simple_pass_789"),
+    ];
+
+    for (input, secret) in &cases {
+        let out = redact_secrets(input);
+        assert!(!out.contains(secret), "failed to redact pwd/pass variant in: {input}");
+        assert!(out.contains("[REDACTED]"), "missing [REDACTED] in: {input}");
+    }
+}
+
+#[test]
+fn redact_digest_and_token_auth_headers() {
+    let digest = "Authorization: Digest username=\"admin\", realm=\"santh\"";
+    let safe_digest = redact_secrets(digest);
+    assert!(!safe_digest.contains("admin"));
+    assert!(safe_digest.contains("[REDACTED]"));
+
+    let token_hdr = "Authorization: Token 9944b09199c62bcf9418ad846d0a4007c6243d2";
+    let safe_token = redact_secrets(token_hdr);
+    assert!(!safe_token.contains("9944b09199c62bcf9418ad846d0a4007c6243d2"));
+    assert!(safe_token.contains("[REDACTED]"));
+}
+
+#[test]
+fn redact_huggingface_token() {
+    let token = "hf_abcdefghijklmnopqrstuvwxyz01234567";
+    let safe = redact_secrets(token);
+    assert!(!safe.contains(token));
+    assert!(safe.contains("[REDACTED]"));
+}
